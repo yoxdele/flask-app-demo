@@ -1,0 +1,47 @@
+name: Deploy Flask App to AWS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build & Push Docker image to ECR
+      run: |
+        REPO_NAME="flask-app-repo"
+        IMAGE_TAG="latest"
+        
+        docker build -t $REPO_NAME:$IMAGE_TAG .
+        docker tag $REPO_NAME:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$REPO_NAME:$IMAGE_TAG
+        docker push ${{ steps.login-ecr.outputs.registry }}/$REPO_NAME:$IMAGE_TAG
+
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: ${{ secrets.EC2_PUBLIC_IP }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          docker pull ${{ steps.login-ecr.outputs.registry }}/flask-app-repo:latest
+          docker stop flask-app || true
+          docker rm flask-app || true
+          docker run -d -p 5000:5000 --name flask-app \
+            ${{ steps.login-ecr.outputs.registry }}/flask-app-repo:latest
