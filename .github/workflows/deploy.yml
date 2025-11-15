@@ -51,6 +51,16 @@ jobs:
           else
             echo "Docker already installed."
           fi
+          # === Install AWS CLI if not installed ===
+          if ! command -v aws &> /dev/null
+          then
+            echo "AWS CLI not found. Installing..."
+            sudo apt install awscli -y
+          fi
+
+          # === Login EC2 to ECR ===
+          aws ecr get-login-password --region us-east-1 \
+            | sudo docker login --username AWS --password-stdin ${{ steps.ecr-login.outputs.registry }}
 
           # === Pull & run your container ===
           sudo docker stop flask-app || true
