@@ -40,7 +40,7 @@ jobs:
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          # === Install Docker if not installed ===
+          # Install Docker if not installed
           if ! command -v docker &> /dev/null
           then
             echo "Docker not found. Installing..."
@@ -52,12 +52,12 @@ jobs:
             echo "Docker already installed."
           fi
 
-          # === Install AWS CLI v2 if not installed ===
+          # Install AWS CLI v2
           if ! command -v aws &> /dev/null
           then
-            echo "AWS CLI not found. Installing..."
+            echo "Installing AWS CLI..."
             sudo apt update -y
-            sudo apt install unzip -y     # <-- REQUIRED
+            sudo apt install unzip -y
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             unzip awscliv2.zip
             sudo ./aws/install
@@ -65,11 +65,16 @@ jobs:
             echo "AWS CLI already installed."
           fi
 
-          # === Login EC2 to ECR ===
+          # 🔥 ADD THIS — inject AWS credentials into EC2
+          export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+          export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          export AWS_DEFAULT_REGION="us-east-1"
+
+          # Login EC2 to ECR
           aws ecr get-login-password --region us-east-1 \
             | sudo docker login --username AWS --password-stdin ${{ steps.ecr-login.outputs.registry }}
 
-          # === Pull & run your container ===
+          # Run container
           sudo docker stop flask-app || true
           sudo docker rm flask-app || true
 
